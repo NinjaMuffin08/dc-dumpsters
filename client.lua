@@ -38,7 +38,6 @@ end
 --- Distance Check On Dumpster Props
 CreateThread(function()
 	while true do
-        local WaitTime = 600
         local PlayerCoords = GetEntityCoords(PlayerPedId())
         for i = 1, #Dumpsters do
             Dumpster = GetClosestObjectOfType(PlayerCoords, 2.0, Dumpsters[i], true)
@@ -55,7 +54,7 @@ CreateThread(function()
                 end
             end
         end
-        Wait(WaitTime)
+        Wait(600)
 	end
 end)
 
@@ -64,7 +63,7 @@ CreateThread(function()
 	while true do
         local WaitTime = 350
         if NearbyDumpster then
-            WaitTime = 3
+            WaitTime = 0
             DrawText3D(DumpsterCoords.x, DumpsterCoords.y, DumpsterCoords.z + 1, "~o~E~w~ - Search Dumpster")
             DrawText3D(DumpsterCoords.x, DumpsterCoords.y, DumpsterCoords.z + 0.80, "~o~G~w~ - Open Dumpster")
             if IsControlJustReleased(0, 38) and not DoingSomething then
