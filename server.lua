@@ -3,6 +3,7 @@ local DumpsterSearched = {}
 local PreviousDumpster = {}
 local Cancelled = {}
 local RestartTimer = 15 -- seconds
+local RewardInventory = true -- true = give items inside of an inventory box, false = give item directly
 local Loot = {
     ['tier1'] = {
         'plastic',
@@ -74,7 +75,7 @@ local function GetTier(Chance)
 end
 
 local function GetAmount(Tier)
-    if Tier == 'tier1' then return math.random(3, 12)
+    if Tier == 'tier1' then return math.random(3, 10)
     elseif Tier == 'tier2' then return math.random(1, 4) end
     return math.random(1, 2)
 end
@@ -99,12 +100,51 @@ RegisterNetEvent('qb-dumpsters:search:check', function(DumpsterCoords)
 
         DumpsterSearched[#DumpsterSearched + 1] = {x = DumpsterCoordsX, y = DumpsterCoordsY}
         PreviousDumpster[src] = DumpsterCoords
-        local Tier = GetTier(math.random(1, 100))
-        local Item = Loot[Tier][math.random(1, #Loot[Tier])]
-        local Amount = GetAmount(Tier)
-        Player.Functions.AddItem(Item, Amount)
-        TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items[Item], "add")
-        TriggerEvent('qb-log:server:CreateLog', 'dumpsters', 'Dumpsters', 'green', string.format("**%s** (CitizenID: %s | ID: %s) - Found %sx %s. Player: %s Dumpster: %s", GetPlayerName(src), Player.PlayerData.citizenid, src, Amount, QBCore.Shared.Items[Item].name, PlayerCoords, DumpsterCoords))
+
+        if not RewardInventory then
+            for i = 1, 3 do
+                local Tier = GetTier(math.random(1, 100))
+                local Item = Loot[Tier][math.random(1, #Loot[Tier])]
+                local Amount = GetAmount(Tier)
+                Player.Functions.AddItem(Item, Amount)
+                TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items[Item], "add")
+                TriggerEvent('qb-log:server:CreateLog', 'dumpsters', 'Dumpsters', 'green', string.format("**%s** (CitizenID: %s | ID: %s) - Found %sx %s. Player: %s Dumpster: %s", GetPlayerName(src), Player.PlayerData.citizenid, src, Amount, QBCore.Shared.Items[Item].name, PlayerCoords, DumpsterCoords))
+            end
+        else
+            local RandomName = "Dumpster"..math.random(1, 999)
+            local Dumpster = {}
+            Dumpster.name = "trunk-"..RandomName
+            Dumpster.label = RandomName
+            Dumpster.maxweight = 8000
+            Dumpster.slots = 5
+            Dumpster.inventory = {}
+            TriggerEvent('inventory:server:addTrunkItems', RandomName, {})
+            for i = 1, 3 do
+                local Tier = GetTier(math.random(1, 100))
+                local Item = Loot[Tier][math.random(1, #Loot[Tier])]
+                local Amount = GetAmount(Tier)
+                local itemInfo = QBCore.Shared.Items[Item]
+                if itemInfo then
+                    Dumpster.inventory[i] = {
+                            name = itemInfo["name"],
+                            amount = Amount,
+                            info = "",
+                            label = itemInfo["label"],
+                            description = itemInfo["description"] or "",
+                            weight = itemInfo["weight"],
+                            type = itemInfo["type"],
+                            unique = itemInfo["unique"],
+                            useable = itemInfo["useable"],
+                            image = itemInfo["image"],
+                            slot = i,
+                    }
+                end
+                TriggerEvent('qb-log:server:CreateLog', 'dumpsters', 'Dumpsters', 'green', string.format("**%s** (CitizenID: %s | ID: %s) - Created %sx %s inside of %s. Player: %s Dumpster: %s", GetPlayerName(src), Player.PlayerData.citizenid, src, Amount, QBCore.Shared.Items[Item].name, RandomName, PlayerCoords, DumpsterCoords))
+            end
+            TriggerEvent('inventory:server:addTrunkItems', RandomName, Dumpster.inventory)
+            Wait(20)
+            TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items, Dumpster)
+        end
         RestartDumpster(DumpsterCoordsX, DumpsterCoordsY, src)
     end)
 end)
