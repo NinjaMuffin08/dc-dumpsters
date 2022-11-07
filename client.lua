@@ -1,5 +1,5 @@
 local QBCore = exports['qb-core']:GetCoreObject()
-local Dumpster
+local ClosestDumpster
 local DumpsterCoords
 local NearbyDumpster
 local Dumpsters = {
@@ -17,38 +17,33 @@ local Weight = 100000
 local function DrawText3D(x, y, z, text)
     SetTextScale(0.35, 0.35)
     SetTextFont(4)
-    SetTextProportional(1)
     SetTextColour(255, 255, 255, 215)
-    SetTextEntry("STRING")
+    BeginTextCommandDisplayText("STRING")
     SetTextCentre(true)
-    AddTextComponentString(text)
-    SetDrawOrigin(x,y,z, 0)
-    DrawText(0.0, 0.0)
+    AddTextComponentSubstringPlayerName(text)
+    SetDrawOrigin(x, y, z, 0)
+    EndTextCommandDisplayText(0.0, 0.0)
     local factor = (string.len(text)) / 370
-    DrawRect(0.0, 0.0+0.0125, 0.017+ factor, 0.03, 0, 0, 0, 75)
+    DrawRect(0.0, 0.0 + 0.0125, 0.017 + factor, 0.03, 0, 0, 0, 75)
     ClearDrawOrigin()
-end
-
---- Standard function to round a number.
-local function round(num, numDecimalPlaces)
-    local mult = 10^(numDecimalPlaces or 0)
-    return math.floor(num * mult + 0.5) / mult
 end
 
 --- Distance Check On Dumpster Props
 CreateThread(function()
+    local Dumpster
 	while true do
         local PlayerCoords = GetEntityCoords(PlayerPedId())
         for i = 1, #Dumpsters do
-            Dumpster = GetClosestObjectOfType(PlayerCoords, 2.0, Dumpsters[i], true)
+            Dumpster = GetClosestObjectOfType(PlayerCoords.x , PlayerCoords.y, PlayerCoords.z, 2.0, Dumpsters[i], false, false, false)
             if Dumpster ~= 0 then
                 DumpsterCoords = GetEntityCoords(Dumpster)
                 if not DoingSomething then
                     if #(PlayerCoords - DumpsterCoords) < 1.8 then
                         NearbyDumpster = true
-                    else 
+                        ClosestDumpster = Dumpster
+                    else
                         NearbyDumpster = false
-                    end 
+                    end
                 else
                     NearbyDumpster = false
                 end
@@ -70,15 +65,22 @@ CreateThread(function()
                 DoingSomething = true
                 TriggerServerEvent('qb-dumpsters:search:check', DumpsterCoords)
             elseif IsControlJustReleased(0, 47) and not DoingSomething then
-                if DumpsterCoords.x < 0 then DumpsterX = -DumpsterCoords.x else DumpsterX = DumpsterCoords.x end
-                if DumpsterCoords.y < 0 then DumpsterY = -DumpsterCoords.y else DumpsterY = DumpsterCoords.y end
-                DumpsterX = round(DumpsterX, 1)
-                DumpsterY = round(DumpsterY, 1)
-                TriggerEvent("inventory:client:SetCurrentStash", "Dumpster | "..DumpsterX.." | "..DumpsterY)
-                TriggerServerEvent("inventory:server:OpenInventory", "stash", "Dumpster | "..DumpsterX.." | "..DumpsterY, {
-                    maxweight = Weight,
-                    slots = Slots,
-                })
+                local NetID = NetworkGetEntityIsNetworked(ClosestDumpster) and NetworkGetNetworkIdFromEntity(ClosestDumpster)
+                if not NetID then
+                    NetworkRegisterEntityAsNetworked(ClosestDumpster)
+                    NetID = NetworkGetNetworkIdFromEntity(ClosestDumpster)
+                    NetworkUseHighPrecisionBlending(NetID, false)
+                    SetNetworkIdExistsOnAllMachines(NetID, true)
+                    SetNetworkIdCanMigrate(NetID, true)
+                    print(NetworkGetEntityIsNetworked(ClosestDumpster), NetworkGetNetworkIdFromEntity(ClosestDumpster))
+                end
+                QBCore.Functions.TriggerCallback('dc-dumpsters:callback:checkCoords', function(CoordX, CoordY)
+                    TriggerEvent("inventory:client:SetCurrentStash", "Dumpster | "..CoordX.." | "..CoordY)
+                    TriggerServerEvent("inventory:server:OpenInventory", "stash", "Dumpster | "..CoordX.." | "..CoordY, {
+                        maxweight = Weight,
+                        slots = Slots,
+                    })
+                end, NetID)
             end
         end
         Wait(WaitTime)

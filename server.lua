@@ -2,8 +2,11 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local DumpsterSearched = {}
 local PreviousDumpster = {}
 local Cancelled = {}
-local RestartTimer = 15 -- seconds
-local RewardInventory = true -- true = give items inside of an inventory box, false = give item directly
+local ExistingDumpsters = {}
+-- seconds
+local RestartTimer = 15
+-- true , give items inside of an inventory box | false , give item directly
+local RewardInventory = true
 local Loot = {
     ['tier1'] = {
         'plastic',
@@ -40,7 +43,7 @@ local function CreateLog(id, source, Player)
     TriggerEvent('qb-log:server:CreateLog', 'dumpsters', 'Dumpsters', 'green', string.format("**%s** (CitizenID: %s | ID: %s) - %s", GetPlayerName(source), Player.PlayerData.citizenid, source, Log[id]))
 end
 
-local function RestartDumpster(DumpsterCoordsX, DumpsterCoordsY, source)
+local function RestartDumpster(DumpsterCoordsX, DumpsterCoordsY)
     local EndTime = os.time() + RestartTimer
 
     while os.time() < EndTime do
@@ -145,11 +148,28 @@ RegisterNetEvent('qb-dumpsters:search:check', function(DumpsterCoords)
             Wait(20)
             TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items, Dumpster)
         end
-        RestartDumpster(DumpsterCoordsX, DumpsterCoordsY, src)
+        RestartDumpster(DumpsterCoordsX, DumpsterCoordsY)
     end)
 end)
 
 RegisterNetEvent('qb-dumpsters:search:cancel', function()
     Cancelled[source] = true
     TriggerClientEvent('QBCore:Notify', source, 'Cancelled', 'error')
+end)
+
+QBCore.Functions.CreateCallback('dc-dumpsters:callback:checkCoords', function(_, cb, NetID)
+    if not DoesEntityExist(NetworkGetEntityFromNetworkId(NetID)) then return end -- add model checking if you want
+    if ExistingDumpsters[NetID] then
+        cb(ExistingDumpsters[NetID].x, ExistingDumpsters[NetID].y)
+    else
+        local Coords = GetEntityCoords(NetworkGetEntityFromNetworkId(NetID))
+        local DumpsterX, DumpsterY
+        if Coords.x < 0 then DumpsterX = -Coords.x else DumpsterX = Coords.x end
+        if Coords.y < 0 then DumpsterY = -Coords.y else DumpsterY = Coords.y end
+        ExistingDumpsters[NetID] = {
+            x = round(DumpsterX, 1),
+            y = round(DumpsterY, 1)
+        }
+        cb(ExistingDumpsters[NetID].x, ExistingDumpsters[NetID].y)
+    end
 end)
